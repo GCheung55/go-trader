@@ -51,6 +51,7 @@ from connors_rsi import connors_rsi_reversion_core
 from vortex_trend import vortex_trend_core
 from relative_vigor_index import relative_vigor_index_core
 from awesome_oscillator import awesome_oscillator_core
+from chande_momentum import chande_momentum_core
 from on_balance_volume import on_balance_volume_divergence_core
 from williams_r import williams_r_param_validator, williams_r_reversal_core
 from money_flow_index import money_flow_index_reversal_core
@@ -1741,6 +1742,29 @@ def awesome_oscillator_strategy(df: pd.DataFrame, fast_period: int = 5, slow_per
 
 
 @register(
+    "chande_momentum",
+    "RESEARCH, no-edge (#1661) \u2014 Chande Momentum Oscillator threshold cross: 100 x (sum of up close changes - sum of down close changes) / (their total) over period unsmoothed changes, not Wilder-smoothed RSI; long when it rises strictly above threshold from at or below it, short when it falls strictly below -threshold from at or above it. Both adjacent windows (period + 2 closes) must hold finite positive closes spaced exactly expected_interval_ms apart, else the entry holds with a reason; a flat window reads 0 and fires nothing. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
+    {"period": 20, "threshold": 25.0, "expected_interval_ms": 3600000},
+    platforms=("futures",),
+    constraints=[
+        "period >= 1",
+        "period <= 198",
+        "threshold > 0",
+        "threshold < 100",
+        "expected_interval_ms >= 1",
+    ],
+    edge_status="no_edge",
+    edge_source="study_fail",
+    edge_ref="backtest/candidates/chande_momentum_1661/REPORT.md",
+    short_entries=True,
+)
+def chande_momentum_strategy(df: pd.DataFrame, period: int = 20, threshold: float = 25.0,
+                             expected_interval_ms: int = 3600000) -> pd.DataFrame:
+    return chande_momentum_core(df, period=period, threshold=threshold,
+                                expected_interval_ms=expected_interval_ms)
+
+
+@register(
     "williams_r_reversal",
     "RESEARCH, no-edge (#1650) \u2014 Williams %R reversal: %R = -100 x (highest high - close) / (highest high - lowest low) over the lookback bars ending at the decision bar; long when the previous %R is at or below oversold and the current %R is strictly above it, short when the previous %R is at or above overbought and the current %R is strictly below it. Needs lookback + 1 valid consecutive candles; any bad candle, timestamp defect or zero-range window holds. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
     {"lookback": 14, "oversold": -80.0, "overbought": -20.0},
@@ -2186,7 +2210,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "regime_adaptive", "regime_adaptive_htf", "analog_retrieval",
         "chaikin_money_flow_breakout", "open_interest_breakout", "connors_rsi_reversion",
         "vortex_trend", "relative_vigor_index", "awesome_oscillator", "williams_r_reversal",
-        "on_balance_volume_divergence",
+        "on_balance_volume_divergence", "chande_momentum",
         "money_flow_index_reversal",
         "aroon_trend",
         "ease_of_movement_breakout",

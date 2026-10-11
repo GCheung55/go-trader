@@ -135,6 +135,24 @@ func TestNoEdgeAdmissionMatrixThroughRealLoaders(t *testing.T) {
 			[]string{`close strategy "ultimate_oscillator"`, "explicit live mode"}, ""},
 		{"research candidate acknowledged live", ack(noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h", "--mode=live"), true), nil, ScopeLive},
 		{"non-no-edge live unchanged", noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h", "--mode=live"), nil, ScopeLive},
+		{"chande paper equals form", noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=paper"), nil, ScopePaper},
+		{"chande paper space form", noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode", "paper"), nil, ScopePaper},
+		{"chande live refused", noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=live"),
+			[]string{`open strategy "chande_momentum"`, "source study_fail", "backtest/candidates/chande_momentum_1661/REPORT.md", "explicit live mode", `"allow_no_edge": true`}, ""},
+		{"chande live acknowledged", ack(noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=live"), true), nil, ScopeLive},
+		{"chande explicit false refused", ack(noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=live"), false), []string{"explicit live mode"}, ""},
+		{"chande missing mode refused", noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h"), []string{`open strategy "chande_momentum"`, "missing --mode"}, ""},
+		{"chande missing mode acknowledged keeps paper scope", ack(noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h"), true), nil, ScopePaper},
+		{"chande repeated mode refused even acknowledged", ack(noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=paper", "--mode=paper"), true), []string{"invalid mode", "given 2 times"}, ""},
+		{"chande unknown mode refused", noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=Paper"), []string{"invalid mode", `"Paper"`}, ""},
+		{"chande close fallback paper", withClose(noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h", "--mode=paper"), "chande_momentum"), nil, ScopePaper},
+		{"chande close fallback live refused", withClose(noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h", "--mode=live"), "chande_momentum"),
+			[]string{`close strategy "chande_momentum"`, "source study_fail", "explicit live mode"}, ""},
+		{"chande close fallback missing mode refused", withClose(noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h"), "chande_momentum"),
+			[]string{`close strategy "chande_momentum"`, "missing --mode"}, ""},
+		{"chande close fallback acknowledged", ack(withClose(noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h", "--mode=live"), "chande_momentum"), true), nil, ScopeLive},
+		{"chande open with native close live refused", withClose(noEdgeHLStrategy("hl-x", "chande_momentum", "ETH", "1h", "--mode=live"), "tiered_tp_pct"),
+			[]string{`open strategy "chande_momentum"`, "explicit live mode"}, ""},
 		{"go spot paper dispatch supplies paper", spot("binanceus", "rsi", "BTC/USDT", "1h"), nil, ScopePaper},
 		{"go spot explicit live refused", spot("binanceus", "rsi", "BTC/USDT", "1h", "--mode=live"), []string{"explicit live mode"}, ""},
 		{"okx spot missing mode refused", spot("okx", "rsi", "BTC/USDT", "1h"), []string{"missing --mode"}, ""},
@@ -170,12 +188,149 @@ func TestNoEdgeAdmissionMatrixThroughRealLoaders(t *testing.T) {
 
 func TestNoEdgeAcknowledgementMustBeAJSONBoolean(t *testing.T) {
 	setNoEdgeLiveCredentials(t)
-	for _, v := range []interface{}{"true", 1, "yes"} {
-		sc := noEdgeHLStrategy("hl-x", "rsi", "ETH", "1h", "--mode=live")
-		sc["allow_no_edge"] = v
-		if cfg, err := LoadConfig(writeNoEdgeConfig(t, CurrentConfigVersion, sc)); err == nil {
-			t.Fatalf("allow_no_edge=%#v loaded (ack=%v); a non-boolean must never grant live admission", v, cfg.Strategies[0].AllowNoEdgeAcknowledged())
+	for _, name := range []string{"rsi", "chande_momentum"} {
+		for _, v := range []interface{}{"true", 1, "yes"} {
+			sc := noEdgeHLStrategy("hl-x", name, "ETH", "1h", "--mode=live")
+			sc["allow_no_edge"] = v
+			if cfg, err := LoadConfig(writeNoEdgeConfig(t, CurrentConfigVersion, sc)); err == nil {
+				t.Fatalf("%s allow_no_edge=%#v loaded (ack=%v); a non-boolean must never grant live admission", name, v, cfg.Strategies[0].AllowNoEdgeAcknowledged())
+			}
 		}
+	}
+}
+
+func chandeLegacyFixture() []map[string]interface{} {
+	openLive := noEdgeHLStrategy("hl-cmo-open", "chande_momentum", "BTC", "1h", "--mode=live")
+	openLive["allow_deprecated"] = true
+	closeOnly := noEdgeHLStrategy("hl-cmo-close", "breakout", "ETH", "1h", "--mode", "live")
+	closeOnly["close_strategy"] = map[string]interface{}{"name": "chande_momentum"}
+	mixed := noEdgeHLStrategy("hl-cmo-mixed", "rsi", "SOL", "1h", "--mode=live")
+	mixed["close_strategy"] = map[string]interface{}{"name": "chande_momentum"}
+	explicitFalse := noEdgeHLStrategy("hl-cmo-false", "chande_momentum", "AVAX", "1h", "--mode=live")
+	explicitFalse["allow_no_edge"] = false
+	preAck := noEdgeHLStrategy("hl-cmo-ack", "chande_momentum", "LINK", "1h", "--mode=live")
+	preAck["allow_no_edge"] = true
+	manual := map[string]interface{}{
+		"id": "hl-cmo-manual", "type": "manual", "platform": "hyperliquid", "symbol": "DOGE", "timeframe": "1h",
+		"open_strategy": map[string]interface{}{"name": "chande_momentum"}, "capital": 100.0, "leverage": 1.0,
+	}
+	return []map[string]interface{}{
+		openLive,
+		closeOnly,
+		mixed,
+		explicitFalse,
+		preAck,
+		manual,
+		noEdgeHLStrategy("hl-cmo-paper", "chande_momentum", "XRP", "1h", "--mode=paper"),
+		noEdgeHLStrategy("hl-control", "macd", "BTC", "4h", "--mode=live"),
+	}
+}
+
+func TestV20NoEdgeMigrationNeverGrantsChandeMomentum(t *testing.T) {
+	setNoEdgeLiveCredentials(t)
+	for _, version := range []int{0, 19} {
+		refusedIDs := []string{"hl-cmo-close", "hl-cmo-false", "hl-cmo-mixed", "hl-cmo-open"}
+		if version == 19 {
+			refusedIDs = append(refusedIDs, "hl-cmo-manual")
+		}
+		t.Run(map[int]string{0: "versionless", 19: "v19"}[version], func(t *testing.T) {
+			path := writeNoEdgeConfig(t, version, chandeLegacyFixture()...)
+			original, _ := os.ReadFile(path)
+
+			for name, load := range map[string]func(string) (*Config, error){"readonly": LoadConfigReadOnly, "probe": LoadConfigForProbe} {
+				cfg, err := load(path)
+				if err == nil {
+					for _, sc := range cfg.Strategies {
+						for _, id := range refusedIDs {
+							if sc.ID == id && sc.AllowNoEdgeAcknowledged() {
+								t.Fatalf("%s: %s gained an in-memory acknowledgement", name, id)
+							}
+						}
+					}
+				} else {
+					for _, id := range refusedIDs {
+						if !strings.Contains(err.Error(), "strategy "+id+":") {
+							t.Fatalf("%s: %s should be refused: %v", name, id, err)
+						}
+					}
+				}
+				if after, _ := os.ReadFile(path); !bytes.Equal(original, after) {
+					t.Fatalf("%s loader changed source bytes", name)
+				}
+			}
+
+			_, err := LoadConfig(path)
+			if err == nil {
+				t.Fatal("unacknowledged live chande_momentum references must stay refused after migration")
+			}
+			for _, id := range refusedIDs {
+				if !strings.Contains(err.Error(), "strategy "+id+":") {
+					t.Fatalf("%s should be refused after migration: %v", id, err)
+				}
+			}
+			for _, id := range []string{"hl-cmo-ack", "hl-cmo-paper", "hl-control"} {
+				if strings.Contains(err.Error(), "strategy "+id+":") {
+					t.Fatalf("%s should be admitted: %v", id, err)
+				}
+			}
+			raw := rawStrategiesByID(t, path)
+			for _, id := range []string{"hl-cmo-open", "hl-cmo-close", "hl-cmo-mixed", "hl-cmo-manual", "hl-cmo-paper"} {
+				if v, has := raw[id]["allow_no_edge"]; has {
+					t.Fatalf("%s gained allow_no_edge=%v from the legacy migration", id, v)
+				}
+			}
+			if raw["hl-cmo-false"]["allow_no_edge"] != false {
+				t.Fatal("an existing explicit false must be preserved")
+			}
+			if raw["hl-cmo-ack"]["allow_no_edge"] != true {
+				t.Fatal("an existing acknowledgement must be preserved")
+			}
+			if raw["hl-control"]["allow_no_edge"] != true {
+				t.Fatal("the legacy migration did not run: the non-candidate control was not stamped")
+			}
+			if _, legacy := raw["hl-cmo-open"]["allow_deprecated"]; legacy {
+				t.Fatal("legacy allow_deprecated kept")
+			}
+			if v := readRawConfig(t, path)["config_version"].(float64); int(v) < 20 {
+				t.Fatalf("config_version = %v, want at least 20", v)
+			}
+
+			migrated, _ := os.ReadFile(path)
+			_, again := LoadConfig(path)
+			if again == nil || again.Error() != err.Error() {
+				t.Fatalf("second load changed the refusal:\nfirst:  %v\nsecond: %v", err, again)
+			}
+			if after, _ := os.ReadFile(path); !bytes.Equal(migrated, after) {
+				t.Fatal("second load changed the migrated config")
+			}
+		})
+	}
+}
+
+func TestV20NoEdgeMigrationReportVetoesChandeMomentum(t *testing.T) {
+	raw := map[string]interface{}{"strategies": []interface{}{}}
+	for _, sc := range chandeLegacyFixture() {
+		blob, _ := json.Marshal(sc)
+		var generic map[string]interface{}
+		_ = json.Unmarshal(blob, &generic)
+		raw["strategies"] = append(raw["strategies"].([]interface{}), generic)
+	}
+	report, err := migrateV20NoEdge(raw, 19)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := stampedIDs(report); !reflect.DeepEqual(got, []string{"hl-control"}) {
+		t.Fatalf("stamped = %v, want only the non-candidate control", got)
+	}
+	if want := []string{"hl-cmo-close", "hl-cmo-manual", "hl-cmo-mixed", "hl-cmo-open"}; !reflect.DeepEqual(report.VetoedResearch, want) {
+		t.Fatalf("vetoed = %v, want %v", report.VetoedResearch, want)
+	}
+	again, err := migrateV20NoEdge(raw, 19)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again.Stamped) != 0 || len(again.VetoedResearch) != 4 {
+		t.Fatalf("second in-memory pass = %+v; it must grant nothing new", again)
 	}
 }
 
@@ -760,7 +915,7 @@ func TestNoEdgePaperAddAcceptsEveryRegisteredPlatformName(t *testing.T) {
 	if _, _, err := buildAddStrategyEntry("pairs_spread", "binanceus", "BTC"); err != nil {
 		t.Fatalf("pairs_spread is spot-registered: %v", err)
 	}
-	for _, name := range []string{"awesome_oscillator", "funding_skew"} {
+	for _, name := range []string{"awesome_oscillator", "chande_momentum", "funding_skew"} {
 		if _, _, err := buildAddStrategyEntry(name, "binanceus", "BTC"); err == nil {
 			t.Fatalf("%s is futures-only but binanceus add accepted it", name)
 		}
@@ -796,6 +951,42 @@ func TestNoEdgeBatchSlotCarriesRawModeEvidenceAndAcknowledgement(t *testing.T) {
 	fpAcked, _ := hyperliquidBatchSlotFingerprint(acked, PositionCtx{}, nil)
 	if fpPlain == fpAcked {
 		t.Fatal("acknowledgement must be part of the slot fingerprint")
+	}
+}
+
+func TestChandeMomentumOperatorAddCreatesBothDirectionHourlyPaperEntry(t *testing.T) {
+	setNoEdgeLiveCredentials(t)
+	id, entry, err := buildAddStrategyEntry("chande_momentum", "hyperliquid", "eth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "hl-cmo-eth" {
+		t.Fatalf("id = %q, want hl-cmo-eth", id)
+	}
+	var sc map[string]interface{}
+	if err := json.Unmarshal(entry, &sc); err != nil {
+		t.Fatal(err)
+	}
+	if sc["direction"] != DirectionBoth {
+		t.Fatalf("direction = %v, want %q", sc["direction"], DirectionBoth)
+	}
+	if _, ack := sc["allow_no_edge"]; ack {
+		t.Fatal("operator add must not acknowledge no-edge live use")
+	}
+	args, _ := sc["args"].([]interface{})
+	if !reflect.DeepEqual(args, []interface{}{"chande_momentum", "ETH", "1h", "--mode=paper"}) {
+		t.Fatalf("args = %v, want the 1h explicit-paper positional form", args)
+	}
+	cfg, err := LoadConfig(writeNoEdgeConfigRoot(t, CurrentConfigVersion, map[string]interface{}{"market_feed": "websocket"}, sc))
+	if err != nil {
+		t.Fatalf("operator-added chande_momentum must load as paper without acknowledgement: %v", err)
+	}
+	got := cfg.Strategies[0]
+	if portfolioScopeFor(got) != ScopePaper || edgeGateModeForStrategy(got).Kind != edgeGateModePaper || got.AllowNoEdgeAcknowledged() {
+		t.Fatalf("operator-added entry is not explicit unacknowledged paper: scope=%q", portfolioScopeFor(got))
+	}
+	if _, _, err := buildAddStrategyEntry("chande_momentum", "binanceus", "ETH"); err == nil {
+		t.Fatal("spot add must refuse the futures-only chande_momentum")
 	}
 }
 
@@ -1207,6 +1398,141 @@ func TestAroonTrendAddAdmissionAndParamPreflightThroughRealLoaders(t *testing.T)
 				if !strings.Contains(loadErr.Error(), want) || !strings.Contains(probeErr.Error(), want) {
 					t.Fatalf("errors missing %q:\nload:  %v\nprobe: %v", want, loadErr, probeErr)
 				}
+			}
+		})
+	}
+}
+
+func TestChandeMomentumIntervalMustMatchTheConfiguredTimeframe(t *testing.T) {
+	setNoEdgeLiveCredentials(t)
+	t.Setenv("TOPSTEP_API_KEY", "k")
+	t.Setenv("TOPSTEP_API_SECRET", "s")
+	t.Setenv("TOPSTEP_ACCOUNT_ID", "1")
+	const cmo = "chande_momentum"
+	withOpenParams := func(sc map[string]interface{}, params map[string]interface{}) map[string]interface{} {
+		sc["open_strategy"] = map[string]interface{}{"name": cmo, "params": params}
+		return sc
+	}
+	withCloseParams := func(sc map[string]interface{}, params map[string]interface{}) map[string]interface{} {
+		ref := map[string]interface{}{"name": cmo}
+		if params != nil {
+			ref["params"] = params
+		}
+		sc["close_strategy"] = ref
+		return sc
+	}
+	okx := func(timeframe string) map[string]interface{} {
+		return map[string]interface{}{
+			"id": "okx-cmo", "type": "perps", "platform": "okx", "script": "shared_scripts/check_okx.py",
+			"args": []string{cmo, "ETH", timeframe, "--mode=paper"}, "capital": 100.0, "max_drawdown_pct": 10.0,
+			"leverage": 1.0,
+		}
+	}
+	topstep := map[string]interface{}{
+		"id": "ts-cmo", "type": "futures", "platform": "topstep", "script": "shared_scripts/check_topstep.py",
+		"args": []string{cmo, "ES", "1h", "--mode=paper"}, "capital": 1000.0, "max_drawdown_pct": 10.0,
+	}
+	interval := func(ms interface{}) map[string]interface{} {
+		return map[string]interface{}{"expected_interval_ms": ms}
+	}
+	manual := func(closeParams map[string]interface{}) map[string]interface{} {
+		ref := map[string]interface{}{"name": cmo}
+		if closeParams != nil {
+			ref["params"] = closeParams
+		}
+		return map[string]interface{}{
+			"id": "hl-cmo-manual", "type": "manual", "platform": "hyperliquid", "symbol": "ETH", "timeframe": "4h",
+			"leverage": 1.0, "capital": 100.0, "allow_no_edge": true, "close_strategy": ref,
+		}
+	}
+	cases := []struct {
+		name    string
+		sc      map[string]interface{}
+		wantErr []string
+		wantRef string
+	}{
+		{"hourly registry default loads", noEdgeHLStrategy("hl-cmo", cmo, "ETH", "1h", "--mode=paper"), nil, ""},
+		{"4h registry default refused", noEdgeHLStrategy("hl-cmo", cmo, "ETH", "4h", "--mode=paper"),
+			[]string{`strategy hl-cmo: open strategy "chande_momentum": registry default expected_interval_ms=3600000 does not match timeframe 4h (14400000 ms)`, `"expected_interval_ms": 14400000`}, ""},
+		{"daily registry default refused", noEdgeHLStrategy("hl-cmo", cmo, "ETH", "1d", "--mode=paper"),
+			[]string{"does not match timeframe 1d (86400000 ms)"}, ""},
+		{"4h explicit match loads", withOpenParams(noEdgeHLStrategy("hl-cmo", cmo, "ETH", "4h", "--mode=paper"), interval(14400000)), nil, `"expected_interval_ms":14400000`},
+		{"hourly explicit 4h value refused", withOpenParams(noEdgeHLStrategy("hl-cmo", cmo, "ETH", "1h", "--mode=paper"), interval(14400000)),
+			[]string{"explicit expected_interval_ms=14400000 does not match timeframe 1h (3600000 ms)"}, ""},
+		{"non-integer value refused", withOpenParams(noEdgeHLStrategy("hl-cmo", cmo, "ETH", "4h", "--mode=paper"), interval(14400000.5)),
+			[]string{"params.expected_interval_ms must be a positive integer"}, ""},
+		{"string value refused", withOpenParams(noEdgeHLStrategy("hl-cmo", cmo, "ETH", "4h", "--mode=paper"), interval("14400000")),
+			[]string{"params.expected_interval_ms must be a positive integer"}, ""},
+		{"close fallback registry default refused on 4h", withCloseParams(noEdgeHLStrategy("hl-cmo", "breakout", "ETH", "4h", "--mode=paper"), nil),
+			[]string{`close strategy "chande_momentum": registry default expected_interval_ms=3600000 does not match timeframe 4h`}, ""},
+		{"close fallback explicit match loads", withCloseParams(noEdgeHLStrategy("hl-cmo", "breakout", "ETH", "4h", "--mode=paper"), interval(14400000)), nil, ""},
+		{"close fallback inherits the open params", withCloseParams(withOpenParams(noEdgeHLStrategy("hl-cmo", cmo, "ETH", "4h", "--mode=paper"), interval(14400000)), nil), nil, ""},
+		{"okx perps 4h explicit match loads", withOpenParams(okx("4h"), interval(14400000)), nil, ""},
+		{"okx perps 4h registry default refused", okx("4h"), []string{`strategy okx-cmo: open strategy "chande_momentum": registry default`}, ""},
+		{"topstep refused for session breaks", topstep, []string{`strategy ts-cmo: open strategy "chande_momentum" holds every signal`, "type=futures platform=topstep", "runs only on perps"}, ""},
+		{"manual close fallback registry default refused on 4h", manual(nil),
+			[]string{`strategy hl-cmo-manual: close strategy "chande_momentum": registry default expected_interval_ms=3600000 does not match timeframe 4h`, `"expected_interval_ms": 14400000`}, ""},
+		{"manual close fallback explicit match loads", manual(interval(14400000)), nil, ""},
+		{"other strategies on 4h unchanged", noEdgeHLStrategy("hl-x", "breakout", "ETH", "4h", "--mode=paper"), nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeNoEdgeConfig(t, CurrentConfigVersion, tc.sc)
+			original, _ := os.ReadFile(path)
+			cfg, loadErr := LoadConfig(path)
+			_, probeErr := LoadConfigForProbe(path)
+			_, readErr := LoadConfigReadOnly(path)
+			for name, err := range map[string]error{"load": loadErr, "probe": probeErr, "readonly": readErr} {
+				if len(tc.wantErr) == 0 {
+					if err != nil {
+						t.Fatalf("%s: unexpected refusal: %v", name, err)
+					}
+					continue
+				}
+				if err == nil {
+					t.Fatalf("%s: expected refusal containing %q", name, tc.wantErr)
+				}
+				for _, want := range tc.wantErr {
+					if !strings.Contains(err.Error(), want) {
+						t.Fatalf("%s: error missing %q: %v", name, want, err)
+					}
+				}
+			}
+			if len(tc.wantErr) > 0 {
+				if after, _ := os.ReadFile(path); !bytes.Equal(original, after) {
+					t.Fatal("a refused config must stay byte-identical")
+				}
+				return
+			}
+			if tc.wantRef != "" {
+				args, err := buildStrategyRefsArg(cfg.Strategies[0], "", false)
+				if err != nil || len(args) != 2 || !strings.Contains(args[1], tc.wantRef) {
+					t.Fatalf("strategy refs = %v, %v; want %s", args, err, tc.wantRef)
+				}
+			}
+		})
+	}
+}
+
+func TestChandeMomentumStudyParityConfigsStillLoad(t *testing.T) {
+	setNoEdgeLiveCredentials(t)
+	for timeframe, want := range map[string]string{"1h": `"expected_interval_ms":3600000`, "4h": `"expected_interval_ms":14400000`} {
+		t.Run(timeframe, func(t *testing.T) {
+			src, err := os.ReadFile(filepath.Join("..", "backtest", "candidates", "chande_momentum_1661", "paper_parity_"+timeframe+".json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, src, 0600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := LoadConfig(path)
+			if err != nil {
+				t.Fatalf("study parity config refused: %v", err)
+			}
+			args, err := buildStrategyRefsArg(cfg.Strategies[0], "", false)
+			if err != nil || len(args) != 2 || !strings.Contains(args[1], want) {
+				t.Fatalf("strategy refs = %v, %v; want %s", args, err, want)
 			}
 		})
 	}

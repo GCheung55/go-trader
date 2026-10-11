@@ -1768,6 +1768,7 @@ func validateConfig(cfg *Config, skipLiveCredentialChecks bool) error {
 
 	errs = append(errs, noEdgeAdmissionErrors(cfg.Strategies)...)
 
+	errs = append(errs, fixedIntervalStrategyErrors(cfg.Strategies)...)
 	errs = append(errs, aroonTrendParamErrors(cfg.Strategies)...)
 
 	errs = append(errs, validatePaperSourcesConfig(cfg)...)

@@ -18,6 +18,7 @@ _SHARED_TOOLS = os.path.join(os.path.dirname(__file__), "..", "shared_tools")
 if _SHARED_TOOLS not in sys.path:
     sys.path.insert(0, _SHARED_TOOLS)
 from funding_fetcher import rejoin_funding_columns
+from closed_bar import FIXED_INTERVAL_PARAM, bind_fixed_interval_params
 
 
 _EXPECTED_FOLD_ERRORS = (KeyError, ValueError, TypeError, IndexError, ZeroDivisionError)
@@ -75,7 +76,9 @@ def warmup_exit_long_entry(warmup_with_signal: pd.DataFrame,
 
 def max_indicator_lookback(param_ranges: Dict[str, list]) -> int:
     max_lb = 0
-    for values in param_ranges.values():
+    for key, values in param_ranges.items():
+        if key == FIXED_INTERVAL_PARAM:
+            continue
         for v in values:
             if isinstance(v, int) and v > max_lb:
                 max_lb = v
@@ -286,7 +289,10 @@ def walk_forward_optimize(
     reg = load_registry(registry)
     apply_strategy = reg.apply_strategy
 
-    param_grid = generate_param_grid(param_ranges)
+    default_params = reg.STRATEGY_REGISTRY[strategy_name]["default_params"] \
+        if strategy_name in reg.STRATEGY_REGISTRY else {}
+    param_grid = [bind_fixed_interval_params(default_params, p, timeframe)
+                  for p in generate_param_grid(param_ranges)]
     warmup = max_indicator_lookback(param_ranges)
 
     if close_stack_grid:
@@ -721,6 +727,10 @@ DEFAULT_PARAM_RANGES = {
     "awesome_oscillator": {
         "fast_period": [3, 5, 8, 13],
         "slow_period": [21, 34, 55, 89],
+    },
+    "chande_momentum": {
+        "period": [10, 14, 20, 30, 40, 60],
+        "threshold": [10.0, 15.0, 25.0, 35.0, 50.0],
     },
     "on_balance_volume_divergence": {
         "left_span": [2, 3, 5],
