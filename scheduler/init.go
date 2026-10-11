@@ -87,6 +87,7 @@ var knownShortNames = map[string]string{
 	"amd_ifvg":                     "amdifvg",
 	"pairs_spread":                 "pairs",
 	"analog_retrieval":             "analog",
+	"aroon_trend":                  "aroon",
 	"awesome_oscillator":           "ao",
 	"chaikin_money_flow_breakout":  "cmfbo",
 	"commodity_channel_trend":      "cci",
@@ -110,6 +111,7 @@ var registeredOpenStrategyPlatforms = map[string][]string{
 	"anchored_vwap":                {"spot", "futures"},
 	"anchored_vwap_channel":        {"spot", "futures"},
 	"anchored_vwap_reversion":      {"spot", "futures"},
+	"aroon_trend":                  {"futures"},
 	"atr_band_revert":              {"spot", "futures"},
 	"atr_breakout":                 {"spot", "futures"},
 	"awesome_oscillator":           {"futures"},
@@ -212,6 +214,7 @@ var bidirectionalPerpsStrategies = map[string]bool{
 	"money_flow_index_reversal":    true,
 	"on_balance_volume_divergence": true,
 	"ultimate_oscillator":          true,
+	"aroon_trend":                  true,
 }
 
 func isBidirectionalPerpsStrategy(id string) bool {

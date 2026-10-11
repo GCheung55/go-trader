@@ -741,6 +741,10 @@ DEFAULT_PARAM_RANGES = {
         "oversold": [10.0, 20.0, 30.0],
         "overbought": [70.0, 80.0, 90.0],
     },
+    "aroon_trend": {
+        "period": [10, 14, 25, 50, 100],
+        "strength": [50.0, 70.0, 85.0],
+    },
     "ultimate_oscillator": {
         "short_window": [5, 7, 9],
         "mid_window": [12, 14, 18],

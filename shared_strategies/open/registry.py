@@ -54,6 +54,7 @@ from awesome_oscillator import awesome_oscillator_core
 from on_balance_volume import on_balance_volume_divergence_core
 from williams_r import williams_r_param_validator, williams_r_reversal_core
 from money_flow_index import money_flow_index_reversal_core
+from aroon_trend import aroon_trend_core, validate_aroon_param_dict
 from ultimate_oscillator import ultimate_oscillator_core
 from fisher_reversal import fisher_reversal_core
 
@@ -72,6 +73,9 @@ VALID_EDGE_SOURCES: Tuple[str, ...] = (
     "study_inconclusive",
     "unvalidated",
 )
+
+
+SINGLE_VALUE_VALIDATED_STRATEGIES: Tuple[str, ...] = ("aroon_trend",)
 
 
 def no_edge_strategies() -> frozenset:
@@ -247,6 +251,8 @@ def validate_param_value(name: str, param: str, value) -> None:
         if lhs == param and isinstance(rhs, float):
             single.append((expr, (lhs, op, rhs)))
     _enforce_parsed_constraints(name, {param: value}, single)
+    if name in SINGLE_VALUE_VALIDATED_STRATEGIES:
+        entry["param_validator"]({**entry["default_params"], param: value})
 
 
 def register(
@@ -1888,6 +1894,27 @@ def ease_of_movement_breakout_strategy(df: pd.DataFrame, eom_period: int = 14,
 
 
 @register(
+    "aroon_trend",
+    "RESEARCH, no-edge (#1643) — Aroon trend crossover: over the trailing period+1 closed bars (decision bar included), Aroon Up = 100*(period - bars since the highest high)/period and Aroon Down = 100*(period - bars since the lowest low)/period, ties picking the most recent bar; long on the bar Up rises strictly above Down from at or below it while Up is strictly above strength, short on the mirror with Down. Needs period+2 valid rows; bad, flat or short windows hold with a reason code. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
+    {"period": 25, "strength": 70.0},
+    platforms=("futures",),
+    constraints=[
+        "period >= 2",
+        "period <= 198",
+        "strength >= 0",
+        "strength <= 100",
+    ],
+    edge_status="no_edge",
+    edge_source="study_inconclusive",
+    edge_ref="backtest/candidates/aroon_trend_1643/REPORT.md",
+    short_entries=True,
+    param_validator=validate_aroon_param_dict,
+)
+def aroon_trend_strategy(df: pd.DataFrame, period: int = 25, strength: float = 70.0) -> pd.DataFrame:
+    return aroon_trend_core(df, period=period, strength=strength)
+
+
+@register(
     "momentum_pro",
     "Momentum Pro — trend-pullback entries in a stacked-EMA trend, ADX-confirmed, on a volume-backed resumption",
     {
@@ -2161,6 +2188,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "vortex_trend", "relative_vigor_index", "awesome_oscillator", "williams_r_reversal",
         "on_balance_volume_divergence",
         "money_flow_index_reversal",
+        "aroon_trend",
         "ease_of_movement_breakout",
         "fisher_reversal",
         "ultimate_oscillator",
