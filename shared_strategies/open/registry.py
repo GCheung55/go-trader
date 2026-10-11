@@ -54,6 +54,7 @@ from awesome_oscillator import awesome_oscillator_core
 from on_balance_volume import on_balance_volume_divergence_core
 from williams_r import williams_r_param_validator, williams_r_reversal_core
 from money_flow_index import money_flow_index_reversal_core
+from ultimate_oscillator import ultimate_oscillator_core
 from fisher_reversal import fisher_reversal_core
 
 
@@ -1808,6 +1809,44 @@ def money_flow_index_reversal_strategy(df: pd.DataFrame, **params) -> pd.DataFra
 
 
 @register(
+    "ultimate_oscillator",
+    "RESEARCH, no-edge (#1664) \u2014 Ultimate Oscillator confirmation of Donchian breakouts: buying pressure is close minus min(low, previous close), true range is max(high, previous close) minus that minimum, and the oscillator is 100 x (4 x short + 2 x mid + long window averages of summed pressure over summed range) / 7; long only when the close first breaks strictly above the prior breakout_lookback high and the oscillator on that same closed bar is strictly above bullish_threshold, short on the mirror below the prior low and bearish_threshold. A failed confirmation holds and no later bar confirms it. Any bad candle, timestamp defect, cadence gap or zero range inside the trailing dependency span holds. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
+    {
+        "short_window": 7,
+        "mid_window": 14,
+        "long_window": 28,
+        "bullish_threshold": 70.0,
+        "bearish_threshold": 30.0,
+        "breakout_lookback": 20,
+    },
+    platforms=("futures",),
+    constraints=[
+        "short_window >= 1",
+        "short_window < mid_window",
+        "mid_window < long_window",
+        "long_window <= 198",
+        "breakout_lookback >= 1",
+        "breakout_lookback <= 197",
+        "bearish_threshold > 0",
+        "bearish_threshold < bullish_threshold",
+        "bullish_threshold < 100",
+    ],
+    edge_status="no_edge",
+    edge_source="study_inconclusive",
+    edge_ref="backtest/candidates/ultimate_oscillator_1664/REPORT.md",
+    short_entries=True,
+)
+def ultimate_oscillator_strategy(df: pd.DataFrame, short_window: int = 7, mid_window: int = 14,
+                                 long_window: int = 28, bullish_threshold: float = 70.0,
+                                 bearish_threshold: float = 30.0,
+                                 breakout_lookback: int = 20) -> pd.DataFrame:
+    return ultimate_oscillator_core(
+        df, short_window=short_window, mid_window=mid_window, long_window=long_window,
+        bullish_threshold=bullish_threshold, bearish_threshold=bearish_threshold,
+        breakout_lookback=breakout_lookback)
+
+
+@register(
     "fisher_reversal",
     "RESEARCH, no-edge (#1646) \u2014 Fisher Transform reversal: the candle midpoint is normalized into [-1, 1] against its inclusive lookback-bar range, smoothed by x = 0.33 * normalized + 0.67 * previous x (clamped 1e-6 inside +/-1) and transformed by F = 0.5 * ln((1 + x) / (1 - x)) + 0.5 * previous F, both recurrences restarted from zero over exactly 64 bars for every timestamp (lookback + 65 bars of history); long when F crosses above its one-bar-lagged trigger after the trigger is below -extreme, short is the mirror above +extreme. Bad, gapped or flat input holds the entry. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
     {"lookback": 9, "extreme": 1.5},
@@ -2124,6 +2163,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "money_flow_index_reversal",
         "ease_of_movement_breakout",
         "fisher_reversal",
+        "ultimate_oscillator",
         "hold",
     ],
 }

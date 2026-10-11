@@ -99,6 +99,7 @@ var knownShortNames = map[string]string{
 	"relative_vigor_index":         "rvi",
 	"vortex_trend":                 "vortex",
 	"williams_r_reversal":          "wrr",
+	"ultimate_oscillator":          "uo",
 	"hold":                         "hold",
 }
 
@@ -159,6 +160,7 @@ var registeredOpenStrategyPlatforms = map[string][]string{
 	"tema_cross_bd":                {"futures"},
 	"triple_ema":                   {"spot", "futures"},
 	"triple_ema_bidir":             {"futures"},
+	"ultimate_oscillator":          {"futures"},
 	"vol_momentum":                 {"spot", "futures"},
 	"volume_weighted":              {"spot", "futures"},
 	"vortex_trend":                 {"futures"},
@@ -209,6 +211,7 @@ var bidirectionalPerpsStrategies = map[string]bool{
 	"williams_r_reversal":          true,
 	"money_flow_index_reversal":    true,
 	"on_balance_volume_divergence": true,
+	"ultimate_oscillator":          true,
 }
 
 func isBidirectionalPerpsStrategy(id string) bool {

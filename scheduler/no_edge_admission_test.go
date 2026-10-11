@@ -126,6 +126,14 @@ func TestNoEdgeAdmissionMatrixThroughRealLoaders(t *testing.T) {
 		{"former research name acknowledged live", ack(noEdgeHLStrategy("hl-x", "awesome_oscillator", "ETH", "4h", "--mode=live"), true), nil, ScopeLive},
 		{"former research name refused live", noEdgeHLStrategy("hl-x", "awesome_oscillator", "ETH", "4h", "--mode=live"),
 			[]string{`"awesome_oscillator"`, "source study_fail", "backtest/candidates/awesome_oscillator_1660/REPORT.md"}, ""},
+		{"research candidate explicit paper", noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h", "--mode=paper"), nil, ScopePaper},
+		{"research candidate refused live", noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h", "--mode=live"),
+			[]string{`open strategy "ultimate_oscillator"`, "source study_inconclusive", "backtest/candidates/ultimate_oscillator_1664/REPORT.md", "explicit live mode"}, ""},
+		{"research candidate missing mode refused", noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h"), []string{"missing --mode"}, ""},
+		{"research candidate invalid mode refused", noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h", "--mode=paper", "--mode=live"), []string{"invalid mode", "given 2 times"}, ""},
+		{"research candidate close fallback refused", withClose(noEdgeHLStrategy("hl-x", "breakout", "SOL", "1h", "--mode=live"), "ultimate_oscillator"),
+			[]string{`close strategy "ultimate_oscillator"`, "explicit live mode"}, ""},
+		{"research candidate acknowledged live", ack(noEdgeHLStrategy("hl-x", "ultimate_oscillator", "SOL", "1h", "--mode=live"), true), nil, ScopeLive},
 		{"non-no-edge live unchanged", noEdgeHLStrategy("hl-x", "breakout", "ETH", "1h", "--mode=live"), nil, ScopeLive},
 		{"go spot paper dispatch supplies paper", spot("binanceus", "rsi", "BTC/USDT", "1h"), nil, ScopePaper},
 		{"go spot explicit live refused", spot("binanceus", "rsi", "BTC/USDT", "1h", "--mode=live"), []string{"explicit live mode"}, ""},
@@ -275,6 +283,9 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	explicitFalse := noEdgeHLStrategy("hl-false", "rsi", "SOL", "1h", "--mode=live")
 	explicitFalse["allow_no_edge"] = false
 	explicitFalse["allow_deprecated"] = true
+	allowedOpenUOClose := noEdgeHLStrategy("hl-bo-uo", "breakout", "SOL", "1h", "--mode=live")
+	allowedOpenUOClose["close_strategy"] = map[string]interface{}{"name": "ultimate_oscillator"}
+	uoOpen := noEdgeHLStrategy("hl-uo", "ultimate_oscillator", "SOL", "1h", "--mode=live")
 	eomOpen := noEdgeHLStrategy("hl-eombo", "ease_of_movement_breakout", "ARB", "1h", "--mode=live")
 	eomOpen["allow_deprecated"] = true
 	eomClose := noEdgeHLStrategy("hl-bo-eom", "breakout", "OP", "1h", "--mode=live")
@@ -297,6 +308,8 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 		wrrClose,
 		noEdgeHLStrategy("hl-mfi", "money_flow_index_reversal", "ETH", "4h", "--mode=live"),
 		mfiClose,
+		uoOpen,
+		allowedOpenUOClose,
 		noEdgeHLStrategy("hl-fisher", "fisher_reversal", "ETH", "4h", "--mode=live"),
 		fisherCloseFallback,
 		noEdgeHLStrategy("hl-missing", "rsi", "DOGE", "1h"),
@@ -307,7 +320,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-eom", "hl-bo-fisher", "hl-bo-mfi", "hl-bo-obv", "hl-eombo", "hl-fisher", "hl-mfi", "hl-mix", "hl-obv", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
+	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-eom", "hl-bo-fisher", "hl-bo-mfi", "hl-bo-obv", "hl-bo-uo", "hl-eombo", "hl-fisher", "hl-mfi", "hl-mix", "hl-obv", "hl-uo", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
 		t.Fatalf("vetoed research = %v, want %v", report.VetoedResearch, want)
 	}
 	if len(report.Stamped) != 0 {
@@ -317,7 +330,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err == nil {
 		t.Fatal("refused references must stay refused after migration")
 	}
-	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-eombo", "hl-bo-eom", "hl-obv", "hl-bo-obv", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-fisher", "hl-bo-fisher", "hl-missing", "hl-invalid", "hl-false"} {
+	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-eombo", "hl-bo-eom", "hl-obv", "hl-bo-obv", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-fisher", "hl-bo-fisher", "hl-uo", "hl-bo-uo", "hl-missing", "hl-invalid", "hl-false"} {
 		if !strings.Contains(err.Error(), "strategy "+id+":") {
 			t.Fatalf("%s should be refused after migration: %v", id, err)
 		}
@@ -330,6 +343,26 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	}
 	if raw["hl-false"]["allow_no_edge"] != false {
 		t.Fatal("an existing explicit false must be preserved")
+	}
+	legacy := map[string]interface{}{"strategies": []interface{}{
+		noEdgeHLStrategy("hl-uo", "ultimate_oscillator", "SOL", "1h", "--mode=live"),
+		func() map[string]interface{} {
+			sc := noEdgeHLStrategy("hl-bo-uo", "breakout", "SOL", "1h", "--mode=live")
+			sc["close_strategy"] = map[string]interface{}{"name": "ultimate_oscillator"}
+			return sc
+		}(),
+	}}
+	report, err = migrateV20NoEdge(legacy, 19)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(report.VetoedResearch, []string{"hl-bo-uo", "hl-uo"}) || len(report.Stamped) != 0 {
+		t.Fatalf("ultimate_oscillator open and close-fallback references must be vetoed, never stamped: vetoed=%v stamped=%+v", report.VetoedResearch, report.Stamped)
+	}
+	for _, item := range legacy["strategies"].([]interface{}) {
+		if _, has := item.(map[string]interface{})["allow_no_edge"]; has {
+			t.Fatalf("%v gained allow_no_edge", item.(map[string]interface{})["id"])
+		}
 	}
 }
 

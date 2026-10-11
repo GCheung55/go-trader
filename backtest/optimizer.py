@@ -741,6 +741,14 @@ DEFAULT_PARAM_RANGES = {
         "oversold": [10.0, 20.0, 30.0],
         "overbought": [70.0, 80.0, 90.0],
     },
+    "ultimate_oscillator": {
+        "short_window": [5, 7, 9],
+        "mid_window": [12, 14, 18],
+        "long_window": [24, 28, 40],
+        "bullish_threshold": [60.0, 70.0, 80.0],
+        "bearish_threshold": [20.0, 30.0, 40.0],
+        "breakout_lookback": [10, 20, 40],
+    },
     "ease_of_movement_breakout": {
         "eom_period": [7, 14, 21, 28],
         "breakout_window": [10, 20, 40, 60],
