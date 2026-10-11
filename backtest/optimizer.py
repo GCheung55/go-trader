@@ -737,6 +737,10 @@ DEFAULT_PARAM_RANGES = {
         "oversold": [10.0, 20.0, 30.0],
         "overbought": [70.0, 80.0, 90.0],
     },
+    "ease_of_movement_breakout": {
+        "eom_period": [7, 14, 21, 28],
+        "breakout_window": [10, 20, 40, 60],
+    },
     "analog_retrieval": {
         "horizon": [6, 12, 24],
         "k_neighbors": [15, 25, 50],
