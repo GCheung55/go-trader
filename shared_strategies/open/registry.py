@@ -54,6 +54,7 @@ from awesome_oscillator import awesome_oscillator_core
 from on_balance_volume import on_balance_volume_divergence_core
 from williams_r import williams_r_param_validator, williams_r_reversal_core
 from money_flow_index import money_flow_index_reversal_core
+from fisher_reversal import fisher_reversal_core
 
 
 VALID_PLATFORMS: Tuple[str, ...] = ("spot", "futures")
@@ -1807,6 +1808,26 @@ def money_flow_index_reversal_strategy(df: pd.DataFrame, **params) -> pd.DataFra
 
 
 @register(
+    "fisher_reversal",
+    "RESEARCH, no-edge (#1646) \u2014 Fisher Transform reversal: the candle midpoint is normalized into [-1, 1] against its inclusive lookback-bar range, smoothed by x = 0.33 * normalized + 0.67 * previous x (clamped 1e-6 inside +/-1) and transformed by F = 0.5 * ln((1 + x) / (1 - x)) + 0.5 * previous F, both recurrences restarted from zero over exactly 64 bars for every timestamp (lookback + 65 bars of history); long when F crosses above its one-bar-lagged trigger after the trigger is below -extreme, short is the mirror above +extreme. Bad, gapped or flat input holds the entry. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
+    {"lookback": 9, "extreme": 1.5},
+    platforms=("futures",),
+    constraints=[
+        "lookback >= 2",
+        "lookback <= 32",
+        "extreme >= 0.5",
+        "extreme <= 3.0",
+    ],
+    edge_status="no_edge",
+    edge_source="study_inconclusive",
+    edge_ref="backtest/candidates/fisher_reversal_1646/REPORT.md",
+    short_entries=True,
+)
+def fisher_reversal_strategy(df: pd.DataFrame, lookback: int = 9, extreme: float = 1.5) -> pd.DataFrame:
+    return fisher_reversal_core(df, lookback=lookback, extreme=extreme)
+
+
+@register(
     "ease_of_movement_breakout",
     "RESEARCH, no-edge (#1671) \u2014 Ease of Movement breakout confirmation: one-bar Ease of Movement is the change in candle midpoint times the current high-minus-low range divided by current base volume, averaged over eom_period bars; long on the first close strictly above the prior breakout_window high while the average is strictly positive, short on the mirror below the prior low with a strictly negative average. Needs declared bar cadence; zero or negative volume, bad candles, timestamp defects and cadence gaps inside the window hold. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
     {"eom_period": 14, "breakout_window": 20},
@@ -2102,6 +2123,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "on_balance_volume_divergence",
         "money_flow_index_reversal",
         "ease_of_movement_breakout",
+        "fisher_reversal",
         "hold",
     ],
 }

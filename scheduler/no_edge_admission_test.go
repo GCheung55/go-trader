@@ -283,6 +283,8 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	obvOpen["allow_deprecated"] = true
 	obvClose := noEdgeHLStrategy("hl-bo-obv", "breakout", "OP", "4h", "--mode=live")
 	obvClose["close_strategy"] = map[string]interface{}{"name": "on_balance_volume_divergence"}
+	fisherCloseFallback := noEdgeHLStrategy("hl-bo-fisher", "breakout", "BTC", "4h", "--mode=live")
+	fisherCloseFallback["close_strategy"] = map[string]interface{}{"name": "fisher_reversal"}
 	path := writeNoEdgeConfig(t, 19,
 		mixed,
 		allowedOpenRefusedClose,
@@ -295,6 +297,8 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 		wrrClose,
 		noEdgeHLStrategy("hl-mfi", "money_flow_index_reversal", "ETH", "4h", "--mode=live"),
 		mfiClose,
+		noEdgeHLStrategy("hl-fisher", "fisher_reversal", "ETH", "4h", "--mode=live"),
+		fisherCloseFallback,
 		noEdgeHLStrategy("hl-missing", "rsi", "DOGE", "1h"),
 		noEdgeHLStrategy("hl-invalid", "rsi", "LINK", "1h", "--mode=live", "--mode=live"),
 		explicitFalse,
@@ -303,7 +307,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-eom", "hl-bo-mfi", "hl-bo-obv", "hl-eombo", "hl-mfi", "hl-mix", "hl-obv", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
+	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-eom", "hl-bo-fisher", "hl-bo-mfi", "hl-bo-obv", "hl-eombo", "hl-fisher", "hl-mfi", "hl-mix", "hl-obv", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
 		t.Fatalf("vetoed research = %v, want %v", report.VetoedResearch, want)
 	}
 	if len(report.Stamped) != 0 {
@@ -313,7 +317,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err == nil {
 		t.Fatal("refused references must stay refused after migration")
 	}
-	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-eombo", "hl-bo-eom", "hl-obv", "hl-bo-obv", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-missing", "hl-invalid", "hl-false"} {
+	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-eombo", "hl-bo-eom", "hl-obv", "hl-bo-obv", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-fisher", "hl-bo-fisher", "hl-missing", "hl-invalid", "hl-false"} {
 		if !strings.Contains(err.Error(), "strategy "+id+":") {
 			t.Fatalf("%s should be refused after migration: %v", id, err)
 		}
