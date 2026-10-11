@@ -274,9 +274,15 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	explicitFalse := noEdgeHLStrategy("hl-false", "rsi", "SOL", "1h", "--mode=live")
 	explicitFalse["allow_no_edge"] = false
 	explicitFalse["allow_deprecated"] = true
+	obvOpen := noEdgeHLStrategy("hl-obv", "on_balance_volume_divergence", "ARB", "4h", "--mode=live")
+	obvOpen["allow_deprecated"] = true
+	obvClose := noEdgeHLStrategy("hl-bo-obv", "breakout", "OP", "4h", "--mode=live")
+	obvClose["close_strategy"] = map[string]interface{}{"name": "on_balance_volume_divergence"}
 	path := writeNoEdgeConfig(t, 19,
 		mixed,
 		allowedOpenRefusedClose,
+		obvOpen,
+		obvClose,
 		noEdgeHLStrategy("hl-ao", "awesome_oscillator", "ETH", "4h", "--mode=live"),
 		noEdgeHLStrategy("hl-wrr", "williams_r_reversal", "BTC", "4h", "--mode=live"),
 		wrrClose,
@@ -290,7 +296,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-mfi", "hl-mfi", "hl-mix", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
+	if want := []string{"hl-ao", "hl-bo-cci", "hl-bo-mfi", "hl-bo-obv", "hl-mfi", "hl-mix", "hl-obv", "hl-wrr", "hl-wrr-close"}; !reflect.DeepEqual(report.VetoedResearch, want) {
 		t.Fatalf("vetoed research = %v, want %v", report.VetoedResearch, want)
 	}
 	if len(report.Stamped) != 0 {
@@ -300,7 +306,7 @@ func TestV20NoEdgeMigrationNeverGrantsRefusedOrNonLiveReferences(t *testing.T) {
 	if err == nil {
 		t.Fatal("refused references must stay refused after migration")
 	}
-	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-missing", "hl-invalid", "hl-false"} {
+	for _, id := range []string{"hl-mix", "hl-bo-cci", "hl-obv", "hl-bo-obv", "hl-ao", "hl-wrr", "hl-wrr-close", "hl-mfi", "hl-bo-mfi", "hl-missing", "hl-invalid", "hl-false"} {
 		if !strings.Contains(err.Error(), "strategy "+id+":") {
 			t.Fatalf("%s should be refused after migration: %v", id, err)
 		}

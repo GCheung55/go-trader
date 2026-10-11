@@ -10,16 +10,17 @@ import (
 const v20LegacyAllowDeprecatedKey = "allow_deprecated"
 
 var v20FormerResearchStrategies = map[string]struct{}{
-	"analog_retrieval":            {},
-	"awesome_oscillator":          {},
-	"chaikin_money_flow_breakout": {},
-	"commodity_channel_trend":     {},
-	"connors_rsi_reversion":       {},
-	"money_flow_index_reversal":   {},
-	"open_interest_breakout":      {},
-	"relative_vigor_index":        {},
-	"vortex_trend":                {},
-	"williams_r_reversal":         {},
+	"analog_retrieval":             {},
+	"awesome_oscillator":           {},
+	"chaikin_money_flow_breakout":  {},
+	"commodity_channel_trend":      {},
+	"connors_rsi_reversion":        {},
+	"money_flow_index_reversal":    {},
+	"on_balance_volume_divergence": {},
+	"open_interest_breakout":       {},
+	"relative_vigor_index":         {},
+	"vortex_trend":                 {},
+	"williams_r_reversal":          {},
 }
 
 var v20StampEligibleStrategies = map[string]struct{}{
