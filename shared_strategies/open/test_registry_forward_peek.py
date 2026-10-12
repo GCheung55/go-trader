@@ -188,6 +188,7 @@ STRATEGY_INPUTS = {
     "adaptive_moving_average": _with_declared_cadence,
     "dual_thrust": _with_declared_cadence,
     "schaff_trend_cycle": _with_declared_cadence,
+    "regression_channel_reversion": _with_declared_cadence,
 }
 
 _FIXTURE_CACHE = {}
