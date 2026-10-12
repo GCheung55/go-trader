@@ -88,6 +88,7 @@ var recoverEntryProbeArgv = []string{
 	"--cloid=0x00000000000000000000000000000001",
 	"--stop-cloid=0x00000000000000000000000000000002",
 	"--since-ms=1",
+	"--until-ms=2",
 	"--mode=live",
 	"--probe-only",
 }
@@ -108,6 +109,8 @@ var okxRecoverEntryProbeArgv = []string{
 	"--symbol=BTC",
 	"--inst-type=swap",
 	"--client-order-id=gtprobe",
+	"--since-ms=1",
+	"--until-ms=2",
 	"--mode=live",
 	"--probe-only",
 }
