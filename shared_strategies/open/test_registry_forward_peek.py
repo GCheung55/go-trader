@@ -187,6 +187,7 @@ STRATEGY_INPUTS = {
     "ease_of_movement_breakout": _with_declared_cadence,
     "adaptive_moving_average": _with_declared_cadence,
     "dual_thrust": _with_declared_cadence,
+    "schaff_trend_cycle": _with_declared_cadence,
 }
 
 _FIXTURE_CACHE = {}

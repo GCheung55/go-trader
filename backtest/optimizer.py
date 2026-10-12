@@ -728,6 +728,13 @@ DEFAULT_PARAM_RANGES = {
         "slope_span": [1, 3, 5],
         "recursion_length": [60, 120, 160],
     },
+    "schaff_trend_cycle": {
+        "fast_period": [12, 23],
+        "slow_period": [26, 50],
+        "cycle_length": [8, 10, 12],
+        "lower_threshold": [20.0, 25.0],
+        "upper_threshold": [75.0, 80.0],
+    },
     "vortex_trend": {
         "period": [7, 14, 21, 28],
         "min_separation": [0.0, 0.02, 0.05, 0.10],
