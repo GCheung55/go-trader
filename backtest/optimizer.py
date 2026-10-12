@@ -735,6 +735,11 @@ DEFAULT_PARAM_RANGES = {
         "lower_threshold": [20.0, 25.0],
         "upper_threshold": [75.0, 80.0],
     },
+    "trix_momentum": {
+        "period": [12, 18],
+        "signal_period": [6, 9, 12],
+        "recursion_length": [120, 144, 192],
+    },
     "camarilla_pivot_reversal": {},
     "vortex_trend": {
         "period": [7, 14, 21, 28],

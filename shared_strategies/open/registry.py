@@ -63,6 +63,7 @@ from fisher_reversal import fisher_reversal_core
 from elder_ray_pullback import elder_ray_pullback_core, validate_elder_ray_param_dict
 from adaptive_moving_average import adaptive_moving_average_core, ama_param_validator
 from schaff_trend_cycle import schaff_trend_cycle_core, stc_param_validator
+from trix_momentum import trix_momentum_core, trix_param_validator
 from camarilla_pivot_reversal import camarilla_pivot_reversal_core, validate_camarilla_param_dict
 
 
@@ -1955,6 +1956,30 @@ def schaff_trend_cycle_strategy(df: pd.DataFrame, fast_period: int = 23, slow_pe
 
 
 @register(
+    "trix_momentum",
+    "RESEARCH, no-edge (#1659) \u2014 triple-smoothed momentum (TRIX) crossover entries: for every endpoint the three chained close EMAs (weight 2 / (period + 1)) restart from the close recursion_length bars back and apply exactly recursion_length updates; the oscillator is 100 times the one-bar fractional change of the third EMA and the signal line is an EMA (weight 2 / (signal_period + 1)) of that local oscillator seeded with its first value. The previous endpoint uses its own trailing run, so a decision reads recursion_length + 2 bars (at most 199). Long when oscillator minus signal line is strictly positive, was at or below zero on the previous bar, and the oscillator is strictly positive; short is the exact mirror. Needs declared bar cadence and recursion_length >= 6 * period; bad candles, timestamp defects, cadence gaps and invalid derived values inside the window hold. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
+    {"period": 18, "signal_period": 9, "recursion_length": 120},
+    platforms=("futures",),
+    constraints=[
+        "period >= 1",
+        "period <= 32",
+        "signal_period >= 1",
+        "signal_period < recursion_length",
+        "recursion_length >= 6",
+        "recursion_length <= 197",
+    ],
+    edge_status="no_edge",
+    edge_source="study_fail",
+    edge_ref="backtest/candidates/trix_momentum_1659/REPORT.md",
+    short_entries=True,
+    param_validator=trix_param_validator,
+)
+def trix_momentum_strategy(df: pd.DataFrame, period: int = 18, signal_period: int = 9,
+                           recursion_length: int = 120) -> pd.DataFrame:
+    return trix_momentum_core(df, period=period, signal_period=signal_period, recursion_length=recursion_length)
+
+
+@register(
     "camarilla_pivot_reversal",
     "RESEARCH, no-edge (#1669) \u2014 Camarilla pivot reversal: the previous complete UTC day (00:00 to 24:00) gives high H, low L and final close C, frozen for the current UTC day as S3 = C - 1.1 x (H - L) / 4, R3 = C + 1.1 x (H - L) / 4, S4 = C - 1.1 x (H - L) / 2 and R4 = C + 1.1 x (H - L) / 2. Long when the preceding closed candle closes at or below S3 and the current closed candle closes strictly above S3 and strictly below R3 with both lows strictly above S4; short when the preceding candle closes at or above R3 and the current candle closes strictly below R3 and strictly above S3 with both highs strictly below R4. Both candles are consecutive bars of the current UTC day; a jump across the opposite level holds. Every bar of the prior day must be present, on the expected_interval_ms grid (15m, 30m, 1h, 2h, 4h, 8h or 12h) and well formed, and the frame must declare its bar interval and timestamp kind, else the entry holds with a reason; levels never carry over a missing day. A check-time frame whose last bar is not the latest closed bar holds. Entry-only; pair with one explicit close strategy and one stop owner. Paper evaluation needs explicit paper mode; live use needs allow_no_edge: true",
     {"expected_interval_ms": 3600000},
@@ -2400,6 +2425,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "dual_thrust",
         "elder_ray_pullback",
         "schaff_trend_cycle",
+        "trix_momentum",
         "camarilla_pivot_reversal",
         "hold",
     ],
