@@ -98,6 +98,7 @@ type addStrategyEntryOnlyCandidate struct {
 var addStrategyEntryOnlyCandidates = map[string]addStrategyEntryOnlyCandidate{
 	"adaptive_moving_average":   {CloseStrategy: "tiered_tp_pct", ClosedBarDecisions: true},
 	"ease_of_movement_breakout": {CloseStrategy: "tiered_tp_atr", ClosedBarDecisions: true},
+	"elder_ray_pullback":        {CloseStrategy: "tiered_tp_pct", ClosedBarDecisions: true},
 	dualThrustStrategyName: {
 		CloseStrategy: "tiered_tp_pct",
 		CloseParams: func() map[string]interface{} {

@@ -716,6 +716,11 @@ DEFAULT_PARAM_RANGES = {
         "lookback": [5, 9, 13, 21],
         "extreme": [0.75, 1.0, 1.5, 2.0],
     },
+    "elder_ray_pullback": {
+        "ema_period": [8, 13, 21],
+        "slope_span": [1, 3, 5],
+        "pullback_window": [4, 8, 16],
+    },
     "adaptive_moving_average": {
         "efficiency_period": [5, 10, 20],
         "fast_period": [2, 3],
