@@ -110,6 +110,17 @@ def strategy_warmup_bars(strategy_name: str, param_grid: List[dict], param_range
             for merged in ({**DEFAULT_PARAMS, **p} for p in param_grid)
         )
         return max(history, max_indicator_lookback(param_ranges))
+    if strategy_name == "klinger_divergence":
+        if _OPEN_STRATEGIES not in sys.path:
+            sys.path.insert(0, _OPEN_STRATEGIES)
+        from klinger_divergence import support_bars
+        defaults = load_registry("futures").STRATEGY_REGISTRY[strategy_name]["default_params"]
+        history = max(
+            support_bars(merged["replay_bars"], merged["left_span"], merged["max_separation"],
+                         merged["right_span"], merged["setup_expiry"])
+            for merged in ({**defaults, **p} for p in param_grid)
+        )
+        return max(history, max_indicator_lookback(param_ranges))
     lookback = max_indicator_lookback(param_ranges)
     if strategy_name in RECURSION_HISTORY_STRATEGIES:
         if _OPEN_STRATEGIES not in sys.path:
@@ -863,6 +874,18 @@ DEFAULT_PARAM_RANGES = {
         "fast_period": [8, 13, 18],
         "signal_period": [5, 7, 9],
         "recursion_length": [180, 198],
+    },
+    "klinger_divergence": {
+        "fast_period": [21, 34],
+        "slow_period": [55, 65],
+        "signal_period": [9, 13],
+        "replay_bars": [96, 112, 128],
+        "left_span": [2, 3],
+        "right_span": [2, 3],
+        "min_separation": [3, 5],
+        "max_separation": [24, 40],
+        "setup_expiry": [6, 12],
+        "divergence_test": [True],
     },
     "vortex_trend": {
         "period": [7, 14, 21, 28],
