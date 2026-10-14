@@ -117,6 +117,7 @@ func (c *marketFeedContext) singleCheckPayload(sc StrategyConfig) ([]byte, error
 	entry, _ := c.entryFor(sc.ID)
 	signalIntervalMs, _ := hlCandleIntervalMs(entry.Signal.Timeframe)
 	attachObservationPayloads(payload, c.Snapshot, entry.observationNeeds(), signalIntervalMs)
+	attachMacroPayloads(payload, c.Snapshot, entry.macroNeeds())
 	c.logSharedPayload("single", sc.ID, specs, []string{coin}, payload)
 	return marketStdinJSON(payload)
 }
@@ -124,6 +125,7 @@ func (c *marketFeedContext) singleCheckPayload(sc StrategyConfig) ([]byte, error
 func (c *marketFeedContext) batchPayload(key hlBatchKey, members []StrategyConfig) (*marketPayload, error) {
 	seen := make(map[marketFeedKey]int)
 	obsNeeds := make(map[feedObservationKey]int64)
+	macroNeeds := make(map[feedMacroKey]int64)
 	var specs []marketPayloadFrameSpec
 	raise := func(fk marketFeedKey, required int) {
 		if existing, ok := seen[fk]; ok {
@@ -180,6 +182,11 @@ func (c *marketFeedContext) batchPayload(key hlBatchKey, members []StrategyConfi
 				obsNeeds[key] = window
 			}
 		}
+		for key, window := range entry.macroNeeds() {
+			if existing, ok := macroNeeds[key]; !ok || window > existing {
+				macroNeeds[key] = window
+			}
+		}
 	}
 	for i := range specs {
 		specs[i].Required = seen[specs[i].Key]
@@ -191,6 +198,7 @@ func (c *marketFeedContext) batchPayload(key hlBatchKey, members []StrategyConfi
 	}
 	batchIntervalMs, _ := hlCandleIntervalMs(key.Timeframe)
 	attachObservationPayloads(payload, c.Snapshot, obsNeeds, batchIntervalMs)
+	attachMacroPayloads(payload, c.Snapshot, macroNeeds)
 	c.logSharedPayload("batch", key.String(), specs, []string{key.Symbol}, payload)
 	return payload, nil
 }
@@ -218,9 +226,10 @@ func (c *marketFeedContext) ownsRegimeBundle(req regimeBundleRequest) bool {
 }
 
 type feedHold struct {
-	Held   bool
-	Key    marketFeedKey
-	Reason string
+	Held      bool
+	EntryOnly bool
+	Key       marketFeedKey
+	Reason    string
 }
 
 func (c *marketFeedContext) feedHoldsSignal(sc StrategyConfig) (bool, string) {
@@ -247,6 +256,9 @@ func (c *marketFeedContext) holdFor(sc StrategyConfig) feedHold {
 	}
 	if held, why := c.Snapshot.fundingHold(entry.Coin, entry.FundingScalar, entry.FundingRecords); held {
 		return feedHold{Held: true, Key: entry.Signal, Reason: why}
+	}
+	if held, why := c.Snapshot.macroHold(entry); held {
+		return feedHold{Held: true, EntryOnly: true, Key: entry.Signal, Reason: why}
 	}
 	return feedHold{}
 }

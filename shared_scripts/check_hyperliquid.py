@@ -61,6 +61,8 @@ from market_payload import (
     market_funding_scalar,
     market_mid,
     market_observation,
+    market_macro_events,
+    market_macro_quotes,
     market_trade_flow,
     validate_market_payload,
 )
@@ -525,6 +527,23 @@ def _shared_trade_flow(shared, symbol):
     return market_trade_flow(market, symbol, MarketPayloadError)
 
 
+MACRO_EVENT_STRATEGY = "macro_event_breakout"
+
+
+def _shared_macro_inputs(shared, symbol, params):
+    params = params or {}
+    calendar_sha = str(params.get("calendar_sha256") or "")
+    quote_sha = str(params.get("quote_sha256") or "")
+    market = shared.get("market")
+    if market is None:
+        reason = ("macro_event_breakout reads calendar and quote records only from the sealed market feed "
+                  "payload; this check has none and never reads artifact files")
+        return {"event_records": {"kind": "macro_calendar", "available": False, "reason": reason},
+                "spread_records": {"kind": "macro_quotes", "available": False, "reason": reason}}
+    return {"event_records": market_macro_events(market, calendar_sha, MarketPayloadError),
+            "spread_records": market_macro_quotes(market, symbol, quote_sha, MarketPayloadError)}
+
+
 def _shared_lead_lag_inputs(shared, symbol, get_strategy, params=None):
     market = shared.get("market")
     if market is None:
@@ -928,6 +947,8 @@ def evaluate_signal_slot(shared, slot, deps=None, admission=None):
                 hold = funding["hold"]
                 if not hold and funding["records"]:
                     decision_params["funding_records"] = funding["records"]
+            if funding_aware_name == MACRO_EVENT_STRATEGY:
+                decision_params.update(_shared_macro_inputs(shared, symbol, strategy_params_override))
         if not hold:
             regime_view = _shared_decision_regime(shared, selection)
             hold = regime_view["hold"]
@@ -969,6 +990,8 @@ def evaluate_signal_slot(shared, slot, deps=None, admission=None):
             strategy_params["open_interest_observations"] = _shared_open_interest(shared, symbol)
         if funding_aware_name == TRADE_FLOW_STRATEGY:
             strategy_params["trade_flow_observations"] = _shared_trade_flow(shared, symbol)
+        if funding_aware_name == MACRO_EVENT_STRATEGY:
+            strategy_params.update(_shared_macro_inputs(shared, symbol, strategy_params_override))
         if funding_aware_name == LEAD_LAG_STRATEGY:
             lead_df, strategy_params["leader_context"] = _shared_lead_lag_inputs(
                 shared, symbol, deps.get_strategy, strategy_params_override)

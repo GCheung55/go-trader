@@ -121,6 +121,7 @@ var knownShortNames = map[string]string{
 	"hold":                         "hold",
 
 	"cumulative_volume_delta_divergence": "cvddiv",
+	"macro_event_breakout":               "macrobrk",
 }
 
 var registeredOpenStrategyPlatforms = map[string][]string{
@@ -207,6 +208,7 @@ var registeredOpenStrategyPlatforms = map[string][]string{
 	"williams_r_reversal":          {"futures"},
 
 	"cumulative_volume_delta_divergence": {"futures"},
+	"macro_event_breakout":               {"futures"},
 	"bitcoin_lead_lag":                   {"futures"},
 }
 
@@ -273,6 +275,7 @@ var bidirectionalPerpsStrategies = map[string]bool{
 	"klinger_divergence":           true,
 
 	"cumulative_volume_delta_divergence": true,
+	"macro_event_breakout":               true,
 }
 
 func isBidirectionalPerpsStrategy(id string) bool {

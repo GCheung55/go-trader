@@ -296,8 +296,9 @@ def run_leg(reg, name: str, params: Optional[dict], symbol: str, timeframe: str,
     import pandas as pd
     from data_fetcher import load_cached_data
     from backtester import Backtester, validate_close_capabilities
-    from run_backtest import (FUNDING_COLUMN_STRATEGIES, OBSERVATION_INPUT_STRATEGIES, TRADE_FLOW_INPUT_STRATEGIES,
-                              _attach_funding_if_needed, _build_profile_label_series)
+    from run_backtest import (FUNDING_COLUMN_STRATEGIES, MACRO_EVENT_INPUT_STRATEGIES, OBSERVATION_INPUT_STRATEGIES,
+                              TRADE_FLOW_INPUT_STRATEGIES, _attach_funding_if_needed, _build_profile_label_series,
+                              attach_macro_event_inputs)
 
     validate_close_capabilities(close_refs=close_strategies,
                                 comparison_mode=comparison_mode,
@@ -370,6 +371,10 @@ def run_leg(reg, name: str, params: Optional[dict], symbol: str, timeframe: str,
                     f"{dataset['key']} attaches no trade_flow series")
             flow_obs, flow_cov = om.attach_trade_flow(manifest, dataset, manifest_window)
             observation_params = {"trade_flow_observations": flow_obs}
+        macro_cov = None
+        if name in MACRO_EVENT_INPUT_STRATEGIES:
+            observation_params, macro_cov = attach_macro_event_inputs(params, symbol, manifest, dataset,
+                                                                      manifest_window)
         if name in LEADER_INPUT_STRATEGIES:
             observation_params, leader_info = manifest_leader_params(
                 manifest, manifest_ctx["window"], df, symbol)
@@ -393,6 +398,7 @@ def run_leg(reg, name: str, params: Optional[dict], symbol: str, timeframe: str,
             "open_interest_sha256": (dataset.get("open_interest") or {}).get("sha256"),
             "trade_flow_coverage": flow_cov,
             "trade_flow_sha256": (dataset.get("trade_flow") or {}).get("sha256"),
+            "macro_event_coverage": macro_cov,
             "leader": leader_info,
             "cost_multiplier": manifest_ctx.get("cost_multiplier", 1.0),
             "cost_model": "execution_spec" if execution_spec else "legacy_flat",
@@ -425,6 +431,8 @@ def run_leg(reg, name: str, params: Optional[dict], symbol: str, timeframe: str,
             platform=FEE_PLATFORM, strategy_type=strategy_type,
             mode=funding_mode, timeframe=timeframe,
         )
+        if name in MACRO_EVENT_INPUT_STRATEGIES:
+            observation_params, _ = attach_macro_event_inputs(params, symbol)
 
     if strategy_df is None:
         strategy_df = df

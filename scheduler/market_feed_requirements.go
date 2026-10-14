@@ -91,6 +91,15 @@ type feedStrategyRequirement struct {
 	LeaderLookback int
 	ClosedBar      bool
 	Timed          bool
+
+	MacroEvents        bool
+	MacroCalendar      feedMacroKey
+	MacroCalendarPath  string
+	MacroHasQuotes     bool
+	MacroQuotes        feedMacroKey
+	MacroQuotePath     string
+	MacroQuoteWindowMs int64
+	MacroErr           string
 }
 
 func (e feedStrategyRequirement) observationNeeds() map[feedObservationKey]int64 {
@@ -118,6 +127,8 @@ type feedRequirements struct {
 	SignalKeys   map[marketFeedKey]bool
 
 	AccountingCoins []string
+
+	Macro map[feedMacroKey]feedMacroNeed
 }
 
 func (r *feedRequirements) addObservation(key feedObservationKey, windowMs int64) {
@@ -197,6 +208,7 @@ func deriveFeedRequirements(cfg *Config) (feedRequirements, error) {
 		Funding:      make(map[string]feedFundingNeed),
 		Observations: make(map[feedObservationKey]int64),
 		Strategies:   make(map[string]feedStrategyRequirement),
+		Macro:        make(map[feedMacroKey]feedMacroNeed),
 	}
 	if cfg == nil {
 		req.finalize()
@@ -309,6 +321,9 @@ func deriveFeedRequirements(cfg *Config) (feedRequirements, error) {
 				req.addObservation(tradeFlowKeyFor(symbol), window)
 			}
 		}
+		if feedStrategyUsesMacroEvents(sc) {
+			deriveMacroRequirement(sc, symbol, &entry, &req)
+		}
 
 		req.Strategies[sc.ID] = entry
 	}
@@ -325,6 +340,8 @@ func deriveFeedRequirements(cfg *Config) (feedRequirements, error) {
 		sort.Strings(errs)
 		return feedRequirements{}, fmt.Errorf("market_feed=%s rejects this config:\n  %s", cfg.marketFeedMode(), strings.Join(errs, "\n  "))
 	}
+	resolveMacroPathConflicts(&req)
+	pruneUnusedMacro(&req)
 	hlCoins, _ := collectPerpsMarkSymbols(cfg.Strategies)
 	req.MidCoins = hlCoins
 	req.AccountingCoins = paperFundingAccountingCoins(cfg.Strategies)
@@ -348,6 +365,10 @@ func validateMarketFeedConfig(cfg *Config) error {
 		if ids := tradeFlowStrategyIDs(cfg); len(ids) > 0 {
 			return fmt.Errorf("market_feed=%q cannot supply trade-flow observations for %s (strategies %s); use market_feed %q or %q",
 				marketFeedREST, cumulativeVolumeDeltaStrategyName, strings.Join(ids, ", "), marketFeedWebsocket, marketFeedShared)
+		}
+		if ids := macroStrategyIDs(cfg); len(ids) > 0 {
+			return fmt.Errorf("market_feed=%q cannot supply sealed calendar and quote records for %s (strategies %s); use market_feed %q or %q",
+				marketFeedREST, macroEventBreakoutStrategyName, strings.Join(ids, ", "), marketFeedWebsocket, marketFeedShared)
 		}
 		return nil
 	case marketFeedWebsocket:
@@ -427,19 +448,21 @@ func (o *marketFeedOwner) ApplyGeneration(ctx context.Context, req feedRequireme
 			}()
 		}
 		wg.Wait()
-		o.publishGeneration(req, token)
+		prepared := o.prepareMacroArtifacts(req.Macro)
+		o.publishGeneration(req, token, prepared)
 	}()
 
 	return done
 }
 
-func (o *marketFeedOwner) publishGeneration(req feedRequirements, token uint64) bool {
+func (o *marketFeedOwner) publishGeneration(req feedRequirements, token uint64, macro map[feedMacroKey]*feedMacroPrepared) bool {
 	o.feedMu.Lock()
 	defer o.feedMu.Unlock()
 	if token != o.applySeq {
 		o.logf("[feed] generation request %d finished after request %d superseded it; keeping the newer key set", token, o.applySeq)
 		return false
 	}
+	o.installMacroLocked(req.Macro, macro)
 	for key := range o.keys {
 		if !req.requires(key) {
 			delete(o.keys, key)

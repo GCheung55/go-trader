@@ -89,6 +89,11 @@ from cumulative_volume_delta_divergence import (
     cumulative_volume_delta_divergence_core,
     cvd_param_validator,
 )
+from macro_event_breakout import (
+    DEFAULT_PARAMS as DEFAULT_MACRO_EVENT_PARAMS,
+    macro_event_breakout_core,
+    macro_param_validator,
+)
 from bitcoin_lead_lag import (
     DEFAULT_PARAMS as DEFAULT_LEAD_LAG_PARAMS,
     bitcoin_lead_lag_core,
@@ -2799,6 +2804,41 @@ def cumulative_volume_delta_divergence_strategy(df: pd.DataFrame, **params) -> p
 
 
 @register(
+    "macro_event_breakout",
+    "RESEARCH, production-refused (#1654) \u2014 scheduled US central-bank rate statement breakout on closed candles: for each statement in a hash-pinned, point-in-time calendar artifact (event_records, only versions known by each decision deadline and published before the release), the range_bars completed candles that close at or before the scheduled release freeze a high/low range; a long needs confirm_bars consecutive closes strictly above it, and a short the mirror below, inside the post_window_bars window that starts at the first bar opening at or after the release; one entry per event, cooldown_bars between entries; with spread_gate the decision also needs a supplied bid/ask quote (spread_records) received by the bar close, at most max_quote_age_ms old, whose (ask - bid) / midpoint is within max_spread_frac. Postponed, cancelled, conflicting or revised schedules, missing coverage and missing or invalid quotes hold the entry with a reason. Entry-only; exits belong to time_stop with max_bars = holding_bars. Research use only: every production config, mode and allow_no_edge acknowledgement is refused until a separate reviewed promotion",
+    dict(DEFAULT_MACRO_EVENT_PARAMS),
+    platforms=("futures",),
+    constraints=[
+        "range_bars >= 1",
+        "range_bars <= 48",
+        "post_window_bars >= 1",
+        "post_window_bars <= 48",
+        "confirm_bars >= 1",
+        "confirm_bars <= 6",
+        "confirm_bars <= post_window_bars",
+        "max_spread_frac > 0",
+        "max_spread_frac <= 0.01",
+        "max_quote_age_ms >= 1000",
+        "max_quote_age_ms <= expected_interval_ms",
+        "cooldown_bars >= 0",
+        "cooldown_bars <= 96",
+        "holding_bars >= 1",
+        "holding_bars <= 240",
+        "expected_interval_ms >= 900000",
+        "expected_interval_ms <= 3600000",
+    ],
+    edge_status="no_edge",
+    edge_source="study_inconclusive",
+    edge_ref="backtest/candidates/macro_event_breakout_1654/REPORT.md",
+    short_entries=True,
+    param_validator=macro_param_validator,
+    production_refused=True,
+)
+def macro_event_breakout_strategy(df: pd.DataFrame, **params) -> pd.DataFrame:
+    return macro_event_breakout_core(df, **params)
+
+
+@register(
     "bitcoin_lead_lag",
     "RESEARCH, production-refused, frozen study FAIL (#1640: net negative on the 1h held-out window at base and stress cost) \u2014 Bitcoin lead-lag entries on closed bars: the BTC perpetual on the follower's own timeframe is the leader; a trailing intercept-and-slope regression of the follower's log return over horizon_bars, starting lag_bars after a BTC bar, on that BTC bar's log return is refitted at every decision from training_bars past pairs whose forecast window closed at or before the decision. A BTC return at least impulse_z standard deviations of the training BTC returns is an impulse event; at the first decision in its forecast window where the slope and both training-half slopes are positive, R-squared is at least min_r2 and the signed forecast minus the follower move already completed exceeds cost_bps + min_edge_bps, it enters once in the impulse direction (mirrored shorts); later decisions, restarts and stop-outs never re-enter from the same impulse. Leader rows come only from a supplied leader_context (same sealed deadline and closed-bar cutoff, or a pinned historical series); missing, stale, duplicate, reordered or unmatched leader data holds the entry with a reason. signal_mode follower_momentum and btc_trend_filter are the frozen study baselines. Entry-only; research use only: every production config, mode and allow_no_edge acknowledgement is refused until a separate reviewed promotion",
     dict(DEFAULT_LEAD_LAG_PARAMS),
@@ -2885,6 +2925,7 @@ PLATFORM_ORDER: Dict[str, List[str]] = {
         "true_strength_index",
         "klinger_divergence",
         "cumulative_volume_delta_divergence",
+        "macro_event_breakout",
         "bitcoin_lead_lag",
         "hold",
     ],

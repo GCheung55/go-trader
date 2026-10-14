@@ -59,6 +59,7 @@ func TestCumulativeVolumeDeltaIsRefusedInEveryModeAndReference(t *testing.T) {
 	fixtures := map[string]struct{ id, coin, tf string }{
 		cumulativeVolumeDeltaStrategyName: {"hl-cvddiv-btc", "BTC", "5m"},
 		bitcoinLeadLagStrategyName:        {"hl-btclag-eth", "ETH", "1h"},
+		macroEventBreakoutStrategyName:    {"hl-macrobrk-btc", "BTC", "1h"},
 	}
 	for _, name := range refused {
 		fx, ok := fixtures[name]

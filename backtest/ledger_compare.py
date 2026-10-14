@@ -1660,6 +1660,10 @@ def capability_matrix(seg: dict, capability_evidence: dict, market: dict, stop_v
         elif name in market.get("trade_flow_input_strategies", ()):
             row("open_strategy", "observation", open_ref, "refused",
                 f"{name} reads recorded trade flow, which the frozen ledger comparison does not prepare")
+        elif name in market.get("macro_event_input_strategies", ()):
+            row("open_strategy", "observation", open_ref, "refused",
+                f"{name} reads point-in-time calendar and quote artifacts, which the frozen ledger comparison "
+                "does not prepare")
         elif name in market.get("leader_input_strategies", ()):
             row("open_strategy", "observation", open_ref, "refused",
                 f"{name} reads a pinned BTC leader series, which the frozen ledger comparison does not prepare")
@@ -2887,16 +2891,18 @@ def compare(export_path: str, input_path: str, mode: str = COMPARISON_MODE_STRIC
     refusals.extend(market["refusals"])
     market_ctx = {"coin": None, "interval": None, "registry": set(), "funding_input_strategies": set(),
                   "observation_input_strategies": set(), "trade_flow_input_strategies": set(),
-                  "leader_input_strategies": set()}
+                  "macro_event_input_strategies": set(), "leader_input_strategies": set()}
     if "dataset" in market:
         from registry_loader import load_registry
         from run_backtest import (FUNDING_COLUMN_STRATEGIES, LEADER_INPUT_STRATEGIES,
-                                  OBSERVATION_INPUT_STRATEGIES, TRADE_FLOW_INPUT_STRATEGIES)
+                                  MACRO_EVENT_INPUT_STRATEGIES, OBSERVATION_INPUT_STRATEGIES,
+                                  TRADE_FLOW_INPUT_STRATEGIES)
         market_ctx = {"coin": market["dataset"]["coin"], "interval": market["manifest"]["interval"],
                       "registry": set(load_registry("futures").STRATEGY_REGISTRY),
                       "funding_input_strategies": set(FUNDING_COLUMN_STRATEGIES),
                       "observation_input_strategies": set(OBSERVATION_INPUT_STRATEGIES),
                       "trade_flow_input_strategies": set(TRADE_FLOW_INPUT_STRATEGIES),
+                      "macro_event_input_strategies": set(MACRO_EVENT_INPUT_STRATEGIES),
                       "leader_input_strategies": set(LEADER_INPUT_STRATEGIES)}
         try:
             import offline_manifest as om

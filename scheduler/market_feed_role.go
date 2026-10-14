@@ -351,7 +351,16 @@ func unionFeedRequirements(consumers []feedConsumer) feedRequirements {
 		for _, coin := range c.Req.AccountingCoins {
 			accounting[coin] = true
 		}
+		for key, need := range c.Req.Macro {
+			if need.Err != "" {
+				continue
+			}
+			for _, path := range need.Paths {
+				union.addMacro(key, path, need.WindowMs)
+			}
+		}
 	}
+	resolveMacroPathConflicts(&union)
 	for coin := range coins {
 		union.MidCoins = append(union.MidCoins, coin)
 	}
@@ -408,6 +417,7 @@ func estimateFeedSealBytes(union feedRequirements) int {
 	for range union.AccountingCoins {
 		total += feedEstimateCoinBytes + int(feedAccountingWindow/time.Hour+1)*feedEstimateAccountingRecordBytes
 	}
+	total += estimateMacroSealBytes(union)
 	return total
 }
 
@@ -756,6 +766,10 @@ func (rt *feedRuntime) reload() {
 	}
 	union := unionFeedRequirements(consumers)
 	cadences := unionFeedCadences(consumers)
+	if macroErrs := macroGenerationReloadErrors(rt.owner.MacroNeeds(), union); len(macroErrs) > 0 {
+		fmt.Fprintf(os.Stderr, "[reload] ERROR: reload rejected; keeping the previous feed generation: %s\n", strings.Join(macroErrs, "; "))
+		return
+	}
 	if est := estimateFeedSealBytes(union); est > feedSealMaxBytes {
 		fmt.Fprintf(os.Stderr, "[reload] ERROR: the new union needs about %d bytes per seal, over the %d-byte cap; keeping the previous feed generation\n", est, feedSealMaxBytes)
 		return
